@@ -73,10 +73,10 @@ public class Main {
                 case WORK_COMPLETE:
                     //msg = Android端outputDir exp: /sdcard/xxx/xxx/output
                     transport.pullResult(outputDir, msg);
-                    transport.sendLastMessage(Events.FromPC.PULL_DATA_FINISH, null);
+                    transport.sendMessage(Events.FromPC.PULL_DATA_FINISH, null);
+                    transport.close();
                     transport.deleteServerWorkDir();
                     println("finish");
-                    System.exit(0);
                     break;
 
                 case ERROR_OCCURED:

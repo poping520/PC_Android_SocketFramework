@@ -18,10 +18,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @version 1.0.0
  * create on 2018/6/23 13:06
  */
-abstract class ServerSocketTread extends Thread {
+public abstract class ServerSocketTread extends Thread {
 
     private int mPort;
     private Socket mSocket;
+    private DataOutputStream mDos;
+    private DataInputStream mDis;
 
     private AtomicBoolean isLooper = new AtomicBoolean(true);
 
@@ -33,41 +35,78 @@ abstract class ServerSocketTread extends Thread {
         }
     };
 
+    private Thread receiveThread = new Thread() {
+        @Override
+        public void run() {
+            try {
+                while (isLooper.get()) {
+                    mDis = new DataInputStream(mSocket.getInputStream());
+                    int code = mDis.readInt();
+                    String str = mDis.readUTF();
+                    Message msg = mHandler.obtainMessage();
+                    msg.what = code;
+                    msg.obj = str;
+                    mHandler.sendMessage(msg);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                if (mSocket != null) {
+                    try {
+                        mSocket.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+                if (mDis != null) {
+                    try {
+                        mDis.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+    };
+
     public void setPort(int port) {
         this.mPort = port;
     }
 
     @Override
     public void run() {
+        ServerSocket serverSocket = null;
         try {
-            ServerSocket serverSocket = new ServerSocket(mPort);
-
+            serverSocket = new ServerSocket(mPort);
             while (isLooper.get()) {
                 mSocket = serverSocket.accept();
-
-                DataInputStream dis = new DataInputStream(mSocket.getInputStream());
-                int code = dis.readInt();
-                String str = dis.readUTF();
-
-                Message msg = mHandler.obtainMessage();
-                msg.what = code;
-                msg.obj = str;
-                mHandler.sendMessage(msg);
+                mDos = new DataOutputStream(mSocket.getOutputStream());
+                receiveThread.start();
             }
-
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
-            close();
+            if (serverSocket != null) {
+                try {
+                    serverSocket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (mDos != null) {
+                try {
+                    mDos.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 
     public void close() {
         if (mSocket != null) {
             try {
-                interrupt();
                 isLooper.set(false);
-                mSocket.close();
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -77,10 +116,9 @@ abstract class ServerSocketTread extends Thread {
     public void sendMessage(int code, String msg) {
         try {
             if (mSocket != null && mSocket.isConnected()) {
-                DataOutputStream dos = new DataOutputStream(mSocket.getOutputStream());
-                dos.writeInt(code);
-                if (msg != null) dos.writeUTF(msg);
-                dos.flush();
+                mDos.writeInt(code);
+                if (msg != null) mDos.writeUTF(msg);
+                mDos.flush();
             }
         } catch (IOException e) {
             e.printStackTrace();

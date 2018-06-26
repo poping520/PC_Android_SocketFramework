@@ -3,14 +3,13 @@ package com.tuojie.transport.android;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.os.Bundle;
-import android.os.Process;
 
 import java.io.File;
 
 /**
  * SocketFramework Android (Server)
  * 工作流程
- * 收到连接请求 => 发送连接成功消息 => 收到数据PUSH完成消息 => 开始任务 => 发送任务完成消息 => 收到结果PULL完成消息 => 结束程序
+ * 收到连接请求 => 发送连接成功消息 => 收到PUSH完成消息 => 开始任务 => 发送任务完成消息 => 收到PULL完成消息 => 结束程序
  * <p>
  * 自定义Activity继承此类，将任务逻辑写到{@link #doWork(String, String, WorkListener)}中
  *

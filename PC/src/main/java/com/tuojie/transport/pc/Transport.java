@@ -63,6 +63,7 @@ public class Transport {
 
         Command.exec(adb + "shell am force-stop " + pkgName);
         Command.Result startAct = Command.exec(String.format("%s shell am start -n %s", adb, amParam));
+        mClientSocket.connect();
 
         if (!startAct.isSucc || startAct.succMsg.contains("does not exist"))
             throw new ClientException("server app [" + pkgName + "] launch fail", startAct);
@@ -102,7 +103,7 @@ public class Transport {
         mClientSocket.sendMessage(event.getCode(), msg);
     }
 
-    public void sendLastMessage(Events.FromPC event, String msg) {
-        mClientSocket.sendLastMessage(event.getCode(), msg);
+    public void close() {
+        mClientSocket.close();
     }
 }
