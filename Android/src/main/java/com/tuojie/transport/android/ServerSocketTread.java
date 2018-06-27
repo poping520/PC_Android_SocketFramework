@@ -9,7 +9,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Socket通信核心类
@@ -25,8 +24,6 @@ public abstract class ServerSocketTread extends Thread {
     private DataOutputStream mDos;
     private DataInputStream mDis;
 
-    private AtomicBoolean isLooper = new AtomicBoolean(true);
-
     private Handler mHandler = new Handler(Looper.myLooper()) {
         @Override
         public void handleMessage(Message msg) {
@@ -39,7 +36,7 @@ public abstract class ServerSocketTread extends Thread {
         @Override
         public void run() {
             try {
-                while (isLooper.get()) {
+                while (true) {
                     mDis = new DataInputStream(mSocket.getInputStream());
                     int code = mDis.readInt();
                     String str = mDis.readUTF();
@@ -47,6 +44,11 @@ public abstract class ServerSocketTread extends Thread {
                     msg.what = code;
                     msg.obj = str;
                     mHandler.sendMessage(msg);
+
+                    //收到客户端pull完成消息 停止循环
+                    if (code == Events.FromPC.PULL_DATA_FINISH.getCode()) {
+                        return;
+                    }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -68,6 +70,7 @@ public abstract class ServerSocketTread extends Thread {
             }
         }
     };
+    private ServerSocket mServerSocket;
 
     public void setPort(int port) {
         this.mPort = port;
@@ -75,39 +78,29 @@ public abstract class ServerSocketTread extends Thread {
 
     @Override
     public void run() {
-        ServerSocket serverSocket = null;
         try {
-            serverSocket = new ServerSocket(mPort);
-            while (isLooper.get()) {
-                mSocket = serverSocket.accept();
-                mDos = new DataOutputStream(mSocket.getOutputStream());
-                receiveThread.start();
-            }
+            mServerSocket = new ServerSocket(mPort);
+            mSocket = mServerSocket.accept();
+            mDos = new DataOutputStream(mSocket.getOutputStream());
+            receiveThread.start();
         } catch (IOException e) {
             e.printStackTrace();
-        } finally {
-            if (serverSocket != null) {
-                try {
-                    serverSocket.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-            if (mDos != null) {
-                try {
-                    mDos.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
         }
     }
 
-    public void close() {
-        if (mSocket != null) {
+    public void closeServer() {
+        if (mServerSocket != null) {
             try {
-                isLooper.set(false);
-            } catch (Exception e) {
+                mServerSocket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        if (mDos != null) {
+            try {
+                mDos.close();
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }

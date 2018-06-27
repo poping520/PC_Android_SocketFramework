@@ -46,10 +46,10 @@ public abstract class ClientSocket implements Runnable {
     }
 
     public void sendMessage(int code, String msg) {
+        if (mDos == null) return;
         try {
             mDos.writeInt(code);
-            msg = msg == null ? "" : msg;
-            mDos.writeUTF(msg);
+            mDos.writeUTF(msg == null ? "" : msg);
             mDos.flush();
         } catch (IOException e) {
             e.printStackTrace();

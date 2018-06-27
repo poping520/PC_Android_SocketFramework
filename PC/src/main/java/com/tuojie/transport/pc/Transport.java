@@ -104,6 +104,11 @@ public class Transport {
     }
 
     public void close() {
+        try {
+            Thread.sleep(200);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         mClientSocket.close();
     }
 }
