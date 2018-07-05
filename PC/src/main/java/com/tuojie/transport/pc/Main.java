@@ -82,7 +82,6 @@ public class Main {
 
                 case ERROR_OCCURED:
                     println("server error occured: " + msg);
-                    System.exit(1);
                     break;
             }
         });
