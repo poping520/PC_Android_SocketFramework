@@ -1,6 +1,7 @@
 package com.tuojie.transport.pc;
 
 import java.io.File;
+import java.io.IOException;
 
 import static com.tuojie.transport.pc.Main.println;
 
@@ -32,7 +33,7 @@ public class Transport {
     };
 
     public void adbConnect(String hostPort) {
-        println("adb connect...");
+        println("\nadb connect...");
         if (hostPort != null) {
             mClientSocket.setHost(hostPort.substring(0, hostPort.indexOf(":")));
         } else {
@@ -73,17 +74,28 @@ public class Transport {
 
     public void pushData(String clientSrcDir, String serverWorkDir) {
         println("push " + clientSrcDir + " to " + serverWorkDir);
-        Command.exec(adb + "shell mkdir -p " + serverWorkDir);
-        Command.Result push = Command.exec(String.format("%s push %s %s", adb, clientSrcDir, serverWorkDir));
-        if (!push.isSucc) throw new ClientException("push data fail", push);
         this.mClientSrcDir = clientSrcDir;
         this.mServerWorkDir = serverWorkDir;
+        Command.exec(adb + "shell mkdir -p " + serverWorkDir);
+        Command.Result push = Command.exec(String.format("%s push %s %s", adb, mClientSrcDir, mServerWorkDir));
+        if (!push.isSucc) throw new ClientException("push data fail", push);
         println("push data success");
     }
 
     public void pullResult(String clientOutputDir, String serverOutputDir) {
         println("server work completed, start pull result data");
-        clientOutputDir = clientOutputDir == null ? new File(mClientSrcDir).getParent() : clientOutputDir;
+
+        if (clientOutputDir == null) {
+            File file = new File(mClientSrcDir);
+            if (!file.isAbsolute()) {
+                try {
+                    clientOutputDir = file.getCanonicalFile().getParent();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            } else
+                clientOutputDir = file.getParent();
+        }
         Command.Result pull = Command.exec(String.format("%s pull %s %s", adb, serverOutputDir, clientOutputDir));
         if (!pull.isSucc) throw new ClientException("pull fail", pull);
         println("pull completed, output to " + clientOutputDir);

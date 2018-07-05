@@ -21,6 +21,7 @@ public abstract class ServerSocketTread extends Thread {
 
     private int mPort;
     private Socket mSocket;
+    private ServerSocket mServerSocket;
     private DataOutputStream mDos;
     private DataInputStream mDis;
 
@@ -70,7 +71,6 @@ public abstract class ServerSocketTread extends Thread {
             }
         }
     };
-    private ServerSocket mServerSocket;
 
     public void setPort(int port) {
         this.mPort = port;

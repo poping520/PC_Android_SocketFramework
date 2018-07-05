@@ -41,6 +41,7 @@ public class Main {
                 ++argstart;
             } else if ("-out".equals(args[argstart])) {
                 outputDir = args[++argstart];
+                ++argstart;
             } else {
                 showUsage();
             }
@@ -81,7 +82,7 @@ public class Main {
 
                 case ERROR_OCCURED:
                     println("server error occured: " + msg);
-                    transport.deleteServerWorkDir();
+                    System.exit(1);
                     break;
             }
         });
