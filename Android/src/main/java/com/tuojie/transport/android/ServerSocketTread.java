@@ -47,8 +47,8 @@ public abstract class ServerSocketTread extends Thread {
                     mHandler.sendMessage(msg);
 
                     //收到客户端pull完成消息 停止循环
-                    if (code == Events.FromPC.PULL_DATA_FINISH.getCode()) {
-                        return;
+                    if (code == Events.FromPC.CLOSE_SERVER_APP.getCode()) {
+                        break;
                     }
                 }
             } catch (IOException e) {

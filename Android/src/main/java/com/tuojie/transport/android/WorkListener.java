@@ -17,8 +17,10 @@ public interface WorkListener {
 
     /**
      * 调用此方法，向PC发送任务完成消息
+     *
+     * @param isSuccess 任务是否执行成功
      */
-    void onWorkComplete();
+    void onWorkComplete(boolean isSuccess);
 
     /**
      * 调用此方法，向PC发送程序异常消息

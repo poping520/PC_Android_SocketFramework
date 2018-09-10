@@ -115,7 +115,7 @@ public class Transport {
         mClientSocket.sendMessage(event.getCode(), msg);
     }
 
-    public void close() {
+    public void closeSocket() {
         try {
             Thread.sleep(200);
         } catch (InterruptedException e) {

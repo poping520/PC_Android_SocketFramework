@@ -11,7 +11,6 @@ import android.util.SparseArray;
  */
 public class Events {
 
-
     /**
      * 来自PC端
      */
@@ -27,9 +26,9 @@ public class Events {
         PUSH_DATA_FINISH(0x1),
 
         /**
-         * pull数据完成
+         * 关闭服务端程序
          */
-        PULL_DATA_FINISH(0x2);
+        CLOSE_SERVER_APP(0x2);
 
 
         private int mCode;
@@ -68,14 +67,19 @@ public class Events {
         WORK_PROGRESS(0x11),
 
         /**
-         * 完成工作
+         * 完成工作 成功
          */
-        WORK_COMPLETE(0x12),
+        WORK_COMPLETE_SUCC(0x12),
+
+        /**
+         * 完成工作 失败
+         */
+        WORK_COMPLETE_FAIL(0x13),
 
         /**
          * 发生错误
          */
-        ERROR_OCCURED(0x13);
+        ERROR_OCCURED(0x14);
 
 
         private int mCode;

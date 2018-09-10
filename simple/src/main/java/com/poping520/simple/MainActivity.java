@@ -42,7 +42,7 @@ public class MainActivity extends WorkActivity {
         copyDir(dataDir, outputDir, listener);
         //do your own work
 
-        listener.onWorkComplete();
+        listener.onWorkComplete(true);
     }
 
     private void copyDir(String src, String dst, WorkListener listener) {

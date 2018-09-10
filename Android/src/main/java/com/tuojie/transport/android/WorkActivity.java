@@ -50,8 +50,11 @@ public abstract class WorkActivity extends Activity {
                         }
 
                         @Override
-                        public void onWorkComplete() {
-                            mTransport.sendMessage(Events.FromAndroid.WORK_COMPLETE, mOutputDir);
+                        public void onWorkComplete(boolean isSuccess) {
+                            if (isSuccess)
+                                mTransport.sendMessage(Events.FromAndroid.WORK_COMPLETE_SUCC, mOutputDir);
+                            else
+                                mTransport.sendMessage(Events.FromAndroid.WORK_COMPLETE_FAIL, null);
                         }
 
                         @Override
@@ -62,7 +65,7 @@ public abstract class WorkActivity extends Activity {
 
                     break;
 
-                case PULL_DATA_FINISH:
+                case CLOSE_SERVER_APP:
                     finish();
                     break;
             }

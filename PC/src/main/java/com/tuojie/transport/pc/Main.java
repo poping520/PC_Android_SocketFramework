@@ -9,6 +9,8 @@ import java.io.File;
  */
 public class Main {
 
+    private static final String VERSION = "1.0.1";
+
     public static final boolean DEBUG = false;
 
     public static void main(String[] args) {
@@ -71,13 +73,16 @@ public class Main {
                     println("server progress: " + msg);
                     break;
 
-                case WORK_COMPLETE:
+                case WORK_COMPLETE_SUCC:
                     //msg = Android端outputDir exp: /sdcard/xxx/xxx/output
                     transport.pullResult(outputDir, msg);
-                    transport.sendMessage(Events.FromPC.PULL_DATA_FINISH, null);
-                    transport.close();
-                    transport.deleteServerWorkDir();
-                    println("finish");
+                    workComplete(transport);
+                    println("work complete; result => success");
+                    break;
+
+                case WORK_COMPLETE_FAIL:
+                    workComplete(transport);
+                    println("work complete; result => fail");
                     break;
 
                 case ERROR_OCCURED:
@@ -89,11 +94,18 @@ public class Main {
         transport.sendMessage(Events.FromPC.CONNECT_REQUEST, null);
     }
 
+    private static void workComplete(Transport transport) {
+        transport.sendMessage(Events.FromPC.CLOSE_SERVER_APP, null);
+        transport.closeSocket();
+        transport.deleteServerWorkDir();
+    }
+
     static void println(String str) {
         System.out.println(str + "\n");
     }
 
     private static void showUsage() {
+        System.out.println(String.format("PC_Android_SocketFramework v%s\n", VERSION));
         System.out.println("<optional params> [must params]");
         System.out.println("<-h>    adb connect host:port       default=>127.0.0.1:52001");
         System.out.println("<-cp>   socket client port          default=>6789");
