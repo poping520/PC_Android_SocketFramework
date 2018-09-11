@@ -15,6 +15,7 @@ public class Events {
      * 来自PC端
      */
     public enum FromPC {
+
         /**
          * 连接请求
          */
@@ -28,8 +29,12 @@ public class Events {
         /**
          * 关闭服务端程序
          */
-        CLOSE_SERVER_APP(0x2);
+        CLOSE_SERVER_APP(0x2),
 
+        /**
+         * 扩展消息
+         */
+        EXTENDED_MESSAGE(0x3);
 
         private int mCode;
 

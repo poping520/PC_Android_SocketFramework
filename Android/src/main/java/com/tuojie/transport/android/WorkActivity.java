@@ -11,7 +11,7 @@ import java.io.File;
  * 工作流程
  * 收到连接请求 => 发送连接成功消息 => 收到PUSH完成消息 => 开始任务 => 发送任务完成消息 => 收到PULL完成消息 => 结束程序
  * <p>
- * 自定义Activity继承此类，将任务逻辑写到{@link #doWork(String, String, WorkListener)}中
+ * 自定义Activity继承此类，将任务逻辑写到{@link #doWork(String, String, String, WorkListener)}中
  *
  * @author WangKZ
  * @version 1.0.0
@@ -27,6 +27,29 @@ public abstract class WorkActivity extends Activity {
 
     private String mOutputDir;
 
+    private String mExtMsg;
+
+    private WorkListener mWorkListener = new WorkListener() {
+
+        @Override
+        public void onProgress(String progressMsg) {
+            mTransport.sendMessage(Events.FromAndroid.WORK_PROGRESS, progressMsg);
+        }
+
+        @Override
+        public void onWorkComplete(boolean isSuccess) {
+            if (isSuccess)
+                mTransport.sendMessage(Events.FromAndroid.WORK_COMPLETE_SUCC, mOutputDir);
+            else
+                mTransport.sendMessage(Events.FromAndroid.WORK_COMPLETE_FAIL, null);
+        }
+
+        @Override
+        public void onWorkError(String errorMsg) {
+            mTransport.sendMessage(Events.FromAndroid.ERROR_OCCURED, errorMsg);
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -41,28 +64,14 @@ public abstract class WorkActivity extends Activity {
                     mTransport.sendMessage(Events.FromAndroid.CONNECT_SUCCESS, mWorkDir);
                     break;
 
+                case EXTENDED_MESSAGE:
+                    mExtMsg = msg;
+                    break;
+
                 case PUSH_DATA_FINISH:
                     //msg = 存放数据的文件夹名字 exp: shared_prefs
-                    doWork(mWorkDir + "/" + msg, mOutputDir, new WorkListener() {
-                        @Override
-                        public void onProgress(String progressMsg) {
-                            mTransport.sendMessage(Events.FromAndroid.WORK_PROGRESS, progressMsg);
-                        }
-
-                        @Override
-                        public void onWorkComplete(boolean isSuccess) {
-                            if (isSuccess)
-                                mTransport.sendMessage(Events.FromAndroid.WORK_COMPLETE_SUCC, mOutputDir);
-                            else
-                                mTransport.sendMessage(Events.FromAndroid.WORK_COMPLETE_FAIL, null);
-                        }
-
-                        @Override
-                        public void onWorkError(String errorMsg) {
-                            mTransport.sendMessage(Events.FromAndroid.ERROR_OCCURED, errorMsg);
-                        }
-                    });
-
+                    doWork(mWorkDir + File.separator + msg,
+                            mOutputDir, mExtMsg, mWorkListener);
                     break;
 
                 case CLOSE_SERVER_APP:
@@ -102,8 +111,8 @@ public abstract class WorkActivity extends Activity {
     /**
      * @param dataDir   目标数据的存放目录
      * @param outputDir 输出目录
-     * @param listener  任务进度监听
+     * @param extMsg    扩展消息
+     * @param listener  任务进度回调
      */
-    protected abstract void doWork(String dataDir, String outputDir, WorkListener listener);
-
+    protected abstract void doWork(String dataDir, String outputDir, String extMsg, WorkListener listener);
 }

@@ -30,7 +30,7 @@ public class MainActivity extends WorkActivity {
     }
 
     @Override
-    protected void doWork(String dataDir, String outputDir, WorkListener listener) {
+    protected void doWork(String dataDir, String outputDir, String extMsg, WorkListener listener) {
         //outputDir = dataDir + "/output"
 
         Log.e(TAG, "dataDir=" + dataDir);

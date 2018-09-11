@@ -26,7 +26,7 @@ public class Transport {
         this.mResponder = responder;
     }
 
-    public void sendMessage(Events.FromAndroid event, String msg) {
+    public synchronized void sendMessage(Events.FromAndroid event, String msg) {
         mServerTread.sendMessage(event.getCode(), msg);
     }
 

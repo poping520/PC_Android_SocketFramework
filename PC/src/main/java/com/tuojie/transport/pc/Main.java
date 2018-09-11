@@ -9,7 +9,7 @@ import java.io.File;
  */
 public class Main {
 
-    private static final String VERSION = "1.0.1";
+    private static final String VERSION = "1.0.2";
 
     public static final boolean DEBUG = false;
 
@@ -22,6 +22,7 @@ public class Main {
         String amParam = null;
         String inputDir = null;
         String outputDir = null;
+        String extMsg = null;
 
         int argstart = 0;
 
@@ -44,6 +45,9 @@ public class Main {
             } else if ("-out".equals(args[argstart])) {
                 outputDir = args[++argstart];
                 ++argstart;
+            } else if ("-ext".equals(args[argstart])) {
+                extMsg = args[++argstart];
+                ++argstart;
             } else {
                 showUsage();
             }
@@ -51,10 +55,12 @@ public class Main {
 
         if (amParam == null || "".equals(amParam)) showUsage();
         if (inputDir == null || "".equals(inputDir)) showUsage();
-        work(hostPort, clientPort, serverPort, amParam, inputDir, outputDir);
+        work(hostPort, clientPort, serverPort, amParam, inputDir, outputDir, extMsg);
     }
 
-    private static void work(String hostPort, int clientPort, int serverPort, String amParam, String inputDir, String outputDir) {
+    private static void work(String hostPort, int clientPort, int serverPort, String amParam, String inputDir,
+                             String outputDir, String extMsg) {
+
         Transport transport = new Transport();
         transport.adbConnect(hostPort);
         transport.connectServer(clientPort, serverPort);
@@ -63,6 +69,10 @@ public class Main {
         transport.registerResponder((event, msg) -> {
             switch (event) {
                 case CONNECT_SUCCESS:
+                    if (extMsg != null && !"".equals(extMsg)) {
+                        transport.sendMessage(Events.FromPC.EXTENDED_MESSAGE, extMsg);
+                    }
+
                     //msg = Android端workDir exp: /sdcard/xxx/xxx
                     transport.pushData(inputDir, msg);
                     transport.sendMessage(Events.FromPC.PUSH_DATA_FINISH, new File(inputDir).getName());
@@ -113,6 +123,7 @@ public class Main {
         System.out.println("[-am]   adb shell am start          com.xxx.xxx/.MainActivity");
         System.out.println("[-in]   input dir                   save all data");
         System.out.println("<-out>  output dir                  default=>input parent dir");
+        System.out.println("<-ext>  extended message            send before push data");
         System.exit(0);
     }
 }
