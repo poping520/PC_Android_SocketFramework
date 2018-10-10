@@ -9,7 +9,6 @@ public abstract class ClientSocket implements Runnable {
 
     private static final String DEFAULT_SERVER_HOST = "127.0.0.1";
 
-    private String mHost;
     private int mPort;
     private Socket mSocket;
     private DataOutputStream mDos;
@@ -30,14 +29,9 @@ public abstract class ClientSocket implements Runnable {
         mPort = port;
     }
 
-    public void setHost(String host) {
-        mHost = host;
-    }
-
     public void connect() {
-        mHost = mHost == null ? DEFAULT_SERVER_HOST : mHost;
         try {
-            mSocket = new Socket(mHost, mPort);
+            mSocket = new Socket(DEFAULT_SERVER_HOST, mPort);
             mDos = new DataOutputStream(mSocket.getOutputStream());
             new Thread(this).start();
         } catch (IOException e) {

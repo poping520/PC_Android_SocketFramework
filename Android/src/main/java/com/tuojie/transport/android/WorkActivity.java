@@ -14,7 +14,6 @@ import java.io.File;
  * 自定义Activity继承此类，将任务逻辑写到{@link #doWork(String, String, String, WorkListener)}中
  *
  * @author WangKZ
- * @version 1.0.0
  * create on 2018/6/25 10:43
  */
 public abstract class WorkActivity extends Activity {
@@ -41,7 +40,7 @@ public abstract class WorkActivity extends Activity {
             if (isSuccess)
                 mTransport.sendMessage(Events.FromAndroid.WORK_COMPLETE_SUCC, mOutputDir);
             else
-                mTransport.sendMessage(Events.FromAndroid.WORK_COMPLETE_FAIL, null);
+                mTransport.sendMessage(Events.FromAndroid.WORK_COMPLETE_FAIL, "");
         }
 
         @Override

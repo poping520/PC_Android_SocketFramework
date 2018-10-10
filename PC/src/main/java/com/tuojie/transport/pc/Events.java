@@ -7,7 +7,6 @@ import java.util.Map;
  * 事件类型
  *
  * @author WangKZ
- * @version 1.0.0
  * create on 2018/6/23 12:52
  */
 public class Events {

@@ -14,7 +14,6 @@ import java.net.Socket;
  * Socket通信核心类
  *
  * @author WangKZ
- * @version 1.0.0
  * create on 2018/6/23 13:06
  */
 public abstract class ServerSocketTread extends Thread {

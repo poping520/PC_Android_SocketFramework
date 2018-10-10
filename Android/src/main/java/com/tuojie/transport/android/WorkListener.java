@@ -1,11 +1,10 @@
 package com.tuojie.transport.android;
 
 /**
- * {@link WorkActivity#doWork(String, String, WorkListener)}
+ * {@link WorkActivity#doWork(String, String, String, WorkListener)}
  * 使用本接口向客户端发送任务的相关信息
  *
  * @author WangKZ
- * @version 1.0.0
  * create on 2018/6/25 10:58
  */
 public interface WorkListener {

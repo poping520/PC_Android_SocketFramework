@@ -4,7 +4,6 @@ package com.tuojie.transport.android;
  * 简单包装{@link ServerSocketTread}
  *
  * @author WangKZ
- * @version 1.0.0
  * create on 2018/6/23 12:43
  */
 public class Transport {

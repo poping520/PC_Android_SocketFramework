@@ -2,7 +2,6 @@ package com.tuojie.transport.android;
 
 /**
  * @author WangKZ
- * @version 1.0.0
  * create on 2018/6/23 12:30
  */
 public interface Responder {

@@ -3,11 +3,10 @@ package com.tuojie.transport.pc;
 import java.io.File;
 import java.io.IOException;
 
-import static com.tuojie.transport.pc.Main.println;
+import static com.tuojie.transport.pc.Main.log;
 
 /**
  * @author WangKZ
- * @version 1.0.0
  * create on 2018/6/23 14:39
  */
 public class Transport {
@@ -15,11 +14,11 @@ public class Transport {
     private static final int DEFAULT_CLIENT_PORT = 6789;
     private static final int DEFAULT_SERVER_PORT = 9876;
 
-    private static final String DEFAULT_HOST_PORT = "127.0.0.1:52001";
+    private static final String DEFAULT_ADB_ENV = "adb";
 
     private Responder mResponder;
 
-    private String adb;
+    private String mAdb;
 
     private String mClientSrcDir;
 
@@ -32,78 +31,67 @@ public class Transport {
         }
     };
 
-    public void adbConnect(String hostPort) {
-        println("\nadb connect...");
-        if (hostPort != null) {
-            mClientSocket.setHost(hostPort.substring(0, hostPort.indexOf(":")));
-        } else {
-            hostPort = DEFAULT_HOST_PORT;
-        }
-        Command.Result connect = Command.exec("adb connect " + hostPort);
-        this.adb = String.format("adb -s %s ", hostPort);
+    public void adbConnect(String adbEnv, String hostPort) {
+        log("adb connect...");
+
+        if (adbEnv != null)
+            mAdb = adbEnv;
+        else
+            mAdb = DEFAULT_ADB_ENV;
+
+        Command.Result connect = Command.exec(String.format("%s connect %s", mAdb, hostPort));
+        mAdb = String.format("%s -s %s ", mAdb, hostPort);
 
         if (!connect.isSucc || connect.succMsg.contains("unable to connect to " + hostPort) || connect.succMsg.contains("cannot connect to " + hostPort))
             throw new ClientException("adb connect fail", connect);
 
-        println("adb connect success");
+        log("adb connect success");
     }
 
     public void connectServer(int clientPort, int serverPort) {
         clientPort = clientPort == 0 ? DEFAULT_CLIENT_PORT : clientPort;
         serverPort = serverPort == 0 ? DEFAULT_SERVER_PORT : serverPort;
 
-        Command.Result forward = Command.exec(String.format("%s forward tcp:%s tcp:%s", adb, clientPort, serverPort));
+        Command.Result forward = Command.exec(String.format("%s forward tcp:%s tcp:%s", mAdb, clientPort, serverPort));
         mClientSocket.setPort(clientPort);
 
         if (!forward.isSucc) throw new ClientException("connect to server fail", forward);
-        println("connect to server success");
+        log("connect to server success");
     }
 
     public void startServerApp(String amParam) {
         String pkgName = amParam.substring(0, amParam.indexOf("/"));
 
-        Command.exec(adb + "shell am force-stop " + pkgName);
-        Command.Result startAct = Command.exec(String.format("%s shell am start -n %s", adb, amParam));
+        Command.exec(mAdb + "shell am force-stop " + pkgName);
+        Command.Result startAct = Command.exec(String.format("%s shell am start -n %s", mAdb, amParam));
         mClientSocket.connect();
 
         if (!startAct.isSucc || startAct.succMsg.contains("does not exist"))
             throw new ClientException("server app [" + pkgName + "] launch fail", startAct);
 
-        println("server app [" + pkgName + "] launch success");
+        log("server app [" + pkgName + "] launch success");
     }
 
     public void pushData(String clientSrcDir, String serverWorkDir) {
-        println("push " + clientSrcDir + " to " + serverWorkDir);
+        log("push " + clientSrcDir + " to " + serverWorkDir);
         this.mClientSrcDir = clientSrcDir;
         this.mServerWorkDir = serverWorkDir;
-        Command.exec(adb + "shell mkdir -p " + serverWorkDir);
-        Command.Result push = Command.exec(String.format("%s push %s %s", adb, mClientSrcDir, mServerWorkDir));
+        Command.exec(mAdb + "shell mkdir -p " + serverWorkDir);
+        Command.Result push = Command.exec(String.format("%s push %s %s", mAdb, mClientSrcDir, mServerWorkDir));
         if (!push.isSucc) throw new ClientException("push data fail", push);
-        println("push data success");
+        log("push data success");
     }
 
     public void pullResult(String clientOutputDir, String serverOutputDir) {
-        println("server work completed, start pull result data");
-
-        if (clientOutputDir == null) {
-            File file = new File(mClientSrcDir);
-            if (!file.isAbsolute()) {
-                try {
-                    clientOutputDir = file.getCanonicalFile().getParent();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            } else
-                clientOutputDir = file.getParent();
-        }
-        Command.Result pull = Command.exec(String.format("%s pull %s %s", adb, serverOutputDir, clientOutputDir));
+        log("server work completed, start pull result data");
+        Command.Result pull = Command.exec(String.format("%s pull %s %s", mAdb, serverOutputDir, clientOutputDir));
         if (!pull.isSucc) throw new ClientException("pull fail", pull);
-        println("pull completed, output to " + clientOutputDir);
+        log("pull completed, output to " + clientOutputDir);
     }
 
     public void deleteServerWorkDir() {
         if (mServerWorkDir != null) {
-            Command.exec(adb + "shell rm -rf " + mServerWorkDir);
+            Command.exec(mAdb + "shell rm -rf " + mServerWorkDir);
         }
     }
 
