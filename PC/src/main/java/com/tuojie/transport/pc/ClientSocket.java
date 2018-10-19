@@ -29,14 +29,17 @@ public abstract class ClientSocket implements Runnable {
         mPort = port;
     }
 
-    public void connect() {
+    public boolean connect() {
         try {
             mSocket = new Socket(DEFAULT_SERVER_HOST, mPort);
             mDos = new DataOutputStream(mSocket.getOutputStream());
             new Thread(this).start();
+
+            return mSocket.isConnected();
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return false;
     }
 
     public void sendMessage(int code, String msg) {

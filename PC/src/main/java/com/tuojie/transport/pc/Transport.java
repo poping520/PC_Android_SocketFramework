@@ -1,8 +1,8 @@
 package com.tuojie.transport.pc;
 
-import java.io.File;
-import java.io.IOException;
+import java.util.Locale;
 
+import static com.tuojie.transport.pc.Main.ATTEMPT_MAX_TIME;
 import static com.tuojie.transport.pc.Main.log;
 
 /**
@@ -16,11 +16,12 @@ public class Transport {
 
     private static final String DEFAULT_ADB_ENV = "adb";
 
+    // 连接超时
+    private static final int CONNECT_TIMEOUT = 10000;
+
     private Responder mResponder;
 
     private String mAdb;
-
-    private String mClientSrcDir;
 
     private String mServerWorkDir;
 
@@ -42,42 +43,67 @@ public class Transport {
         Command.Result connect = Command.exec(String.format("%s connect %s", mAdb, hostPort));
         mAdb = String.format("%s -s %s ", mAdb, hostPort);
 
-        if (!connect.isSucc || connect.succMsg.contains("unable to connect to " + hostPort) || connect.succMsg.contains("cannot connect to " + hostPort))
+        if (!connect.isSucc
+                || connect.succMsg.contains("unable to connect to " + hostPort)
+                || connect.succMsg.contains("cannot connect to " + hostPort))
             throw new ClientException("adb connect fail", connect);
 
         log("adb connect success");
     }
 
-    public void connectServer(int clientPort, int serverPort) {
+    public void connectServer(int clientPort, int serverPort, String amParam) {
+
+        // 连接失败超时处理
+        for (int time = 0; time <= ATTEMPT_MAX_TIME; time++) {
+            if (connectServerInternal(clientPort, serverPort, amParam)) {
+                log("connect to server success");
+                return;
+            } else {
+                if (time == ATTEMPT_MAX_TIME) {
+                    throw new ClientException("connect to server timeout");
+                }
+
+                log(String.format(Locale.ENGLISH,
+                        "connect to server fail, wait 10s to try next connect(%d/%d)",
+                        time + 1, ATTEMPT_MAX_TIME));
+                try {
+                    Thread.sleep(CONNECT_TIMEOUT);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    private boolean connectServerInternal(int clientPort, int serverPort, String amParam) {
         clientPort = clientPort == 0 ? DEFAULT_CLIENT_PORT : clientPort;
         serverPort = serverPort == 0 ? DEFAULT_SERVER_PORT : serverPort;
 
         Command.Result forward = Command.exec(String.format("%s forward tcp:%s tcp:%s", mAdb, clientPort, serverPort));
+        if (!forward.isSucc) {
+            log("adb forward fail");
+            return false;
+        }
         mClientSocket.setPort(clientPort);
 
-        if (!forward.isSucc) throw new ClientException("connect to server fail", forward);
-        log("connect to server success");
-    }
-
-    public void startServerApp(String amParam) {
         String pkgName = amParam.substring(0, amParam.indexOf("/"));
-
         Command.exec(mAdb + "shell am force-stop " + pkgName);
         Command.Result startAct = Command.exec(String.format("%s shell am start -n %s", mAdb, amParam));
-        mClientSocket.connect();
+        if (!startAct.isSucc || startAct.succMsg.contains("does not exist")) {
+            log("server app [" + pkgName + "] start fail, reason => " + startAct.toString());
+            return false;
+        }
+        log("server app [" + pkgName + "] start success");
 
-        if (!startAct.isSucc || startAct.succMsg.contains("does not exist"))
-            throw new ClientException("server app [" + pkgName + "] launch fail", startAct);
-
-        log("server app [" + pkgName + "] launch success");
+        return mClientSocket.connect();
     }
 
     public void pushData(String clientSrcDir, String serverWorkDir) {
         log("push " + clientSrcDir + " to " + serverWorkDir);
-        this.mClientSrcDir = clientSrcDir;
+
         this.mServerWorkDir = serverWorkDir;
         Command.exec(mAdb + "shell mkdir -p " + serverWorkDir);
-        Command.Result push = Command.exec(String.format("%s push %s %s", mAdb, mClientSrcDir, mServerWorkDir));
+        Command.Result push = Command.exec(String.format("%s push %s %s", mAdb, clientSrcDir, mServerWorkDir));
         if (!push.isSucc) throw new ClientException("push data fail", push);
         log("push data success");
     }
@@ -99,7 +125,7 @@ public class Transport {
         this.mResponder = responder;
     }
 
-    public void sendMessage(Events.FromPC event, String msg) {
+    public synchronized void sendMessage(Events.FromPC event, String msg) {
         mClientSocket.sendMessage(event.getCode(), msg);
     }
 

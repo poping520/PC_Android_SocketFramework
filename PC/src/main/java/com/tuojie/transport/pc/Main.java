@@ -7,37 +7,48 @@ import java.io.OutputStreamWriter;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
- * SocketFramework PC (Client)
- * 工作流程
- * 发送连接请求 => 收到连接成功消息 => PUSH数据 => 发送PUSH完成消息 => 收到任务完成消息 => PULL结果 => 发送PULL完成消息 => 结束程序
- *
- * 1.0.4
- * 增加 "-log" 参数, 保存日志到文件中 (保存到输出文件夹 socket_framework.log 中)
- * 优化 "-h" 改为必填参数
- * 优化 当输出文件夹不存在时创建改文件夹
- * 注意 无法从安卓设备 pull 一个文件夹到电脑某个磁盘的根目录 (adb原因)
- *
- * 1.0.3
- * 增加 自定义 adb.exe 的路径
- * 修复 某些情况下无法连接到服务端 {@link ClientSocket#connect()}
- *
- * 1.0.2
- * 增加 "-ext" 参数 (附加信息)
- * 增加 任务完成回调 isSuccess 参数
- *
- * 1.0.1
- * 优化 使用 "adb -s xxx:xxx" 命令 (多设备连接的情况指定某个设备)
- *
- * 1.0.0
- * 第一版
+ * <b>SocketFramework PC (Client)</b><p>
+ * 工作流程<p>
+ * 发送连接请求 => 收到连接成功消息 => PUSH数据 => 发送PUSH完成消息 => 收到任务完成消息 => PULL结果 => 发送PULL完成消息 => 结束程序<p>
+ * <p>
+ * 1.0.5<p>
+ * 增加 连接失败超时和服务端无响应超时处理 超时后会进行一定次数内的重试<p>
+ * <p>
+ * 1.0.4<p>
+ * 增加 "-log" 参数, 保存日志到文件中 (保存到输出文件夹 socket_framework.log 中)<p>
+ * 优化 "-h" 改为必填参数<p>
+ * 优化 当输出文件夹不存在时创建该文件夹<p>
+ * 注意 无法从安卓设备 pull 一个文件夹到电脑某个磁盘的根目录 (adb原因)<p>
+ * <p>
+ * 1.0.3<p>
+ * 增加 "-adb" 参数, 自定义 adb.exe 的路径<p>
+ * 修复 某些情况下无法连接到服务端 {@link ClientSocket#connect()}<p>
+ * <p>
+ * 1.0.2<p>
+ * 增加 "-ext" 参数 (附加信息)<p>
+ * 增加 任务完成回调 isSuccess 参数<p>
+ * <p>
+ * 1.0.1<p>
+ * 优化 使用 "adb -s xxx:xxx" 命令 (多设备连接的情况指定某个设备)<p>
+ * <p>
+ * 1.0.0<p>
+ * 第一版<p>
  */
 public class Main {
 
-    private static final String VERSION = "1.0.4";
+    private static final String VERSION = "1.0.5";
 
     public static final boolean DEBUG = false;
+
+    // 响应超时
+    private static final int RESPONSE_TIMEOUT = 5000;
+
+    // 最大连接次数
+    static final int ATTEMPT_MAX_TIME = 5;
 
     private static boolean isSaveLog;
 
@@ -117,8 +128,6 @@ public class Main {
         }
         sLogFile = new File(outFile, "socket_framework.log");
 
-        log("\n==========> this work start at " + getCurrentTime() + " <==========");
-
         work(hostPort, adbEnv, clientPort, serverPort, amParam, inputDir, outputDir, extMsg);
     }
 
@@ -126,14 +135,16 @@ public class Main {
                              int serverPort, String amParam, String inputDir,
                              String outputDir, String extMsg) {
 
-        Transport transport = new Transport();
-        transport.adbConnect(adbEnv, hostPort);
-        transport.connectServer(clientPort, serverPort);
-        transport.startServerApp(amParam);
+        log("\n==========> this work start at " + getCurrentTime() + " <==========");
 
+        final Timer timer = new Timer();
+
+        final Transport transport = new Transport();
         transport.registerResponder((event, msg) -> {
             switch (event) {
                 case CONNECT_SUCCESS:
+                    timer.cancel();
+
                     if (extMsg != null && !"".equals(extMsg)) {
                         transport.sendMessage(Events.FromPC.EXTENDED_MESSAGE, extMsg);
                     }
@@ -166,7 +177,32 @@ public class Main {
             }
         });
 
-        transport.sendMessage(Events.FromPC.CONNECT_REQUEST, null);
+        // 服务端无响应超时处理
+        timer.schedule(new TimerTask() {
+
+            int times = 0;
+
+            @Override
+            public void run() {
+
+                if (times > ATTEMPT_MAX_TIME) {
+                    timer.cancel();
+                    throw new ClientException("cant receive server response, try max time");
+                }
+
+                if (times > 0) {
+                    log(String.format(Locale.ENGLISH,
+                            "cant receive server response, try to reconnect(%d/%d)", times, ATTEMPT_MAX_TIME));
+                }
+
+                transport.adbConnect(adbEnv, hostPort);
+                transport.closeSocket();
+                transport.connectServer(clientPort, serverPort, amParam);
+                transport.sendMessage(Events.FromPC.CONNECT_REQUEST, null);
+
+                ++times;
+            }
+        }, 0, RESPONSE_TIMEOUT);
     }
 
     private static void workComplete(Transport transport) {
