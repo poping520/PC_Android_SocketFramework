@@ -1,15 +1,18 @@
 package com.tuojie.transport.pc;
 
+import java.io.File;
 import java.util.Locale;
 
-import static com.tuojie.transport.pc.Main.ATTEMPT_MAX_TIME;
-import static com.tuojie.transport.pc.Main.log;
+import static com.tuojie.transport.pc.Main.*;
+import static com.tuojie.transport.pc.Logger.log;
+import static com.tuojie.transport.pc.Utils.getStackTraceMessage;
+import static com.tuojie.transport.pc.Utils.isNullStr;
 
 /**
  * @author WangKZ
  * create on 2018/6/23 14:39
  */
-public class Transport {
+class Transport {
 
     private static final int DEFAULT_CLIENT_PORT = 6789;
     private static final int DEFAULT_SERVER_PORT = 9876;
@@ -17,29 +20,103 @@ public class Transport {
     private static final String DEFAULT_ADB_ENV = "adb";
 
     // 连接超时
-    private static final int CONNECT_TIMEOUT = 10000;
+    private static final int CONNECT_TIMEOUT = 5000;
 
-    private Responder mResponder;
+    // 最大连接次数
+    private static final int ATTEMPT_MAX_TIME = 10;
 
+    // 参数
+    private Params mParams;
+
+    // adb 环境
     private String mAdb;
 
-    private String mServerWorkDir;
-
     private ClientSocket mClientSocket = new ClientSocket() {
+
         @Override
-        public void onReceive(int code, String msg) {
-            mResponder.onResponse(Events.FromAndroid.getEvent(code), msg);
+        public void onResponse(Events.FromAndroid event, String msg) {
+            switch (event) {
+                case CONNECT_SUCCESS:
+                    //msg = Android端workDir exp: /sdcard/xxx/xxx
+                    log("received connect success response from server");
+                    onConnectSuccess(msg);
+                    break;
+
+                case WORK_PROGRESS:
+                    //msg = 进度信息
+                    log("server progress: " + msg);
+                    break;
+
+                case WORK_COMPLETE_SUCC:
+                case WORK_COMPLETE_FAIL:
+                    //msg = Android端outputDir exp: /sdcard/xxx/xxx/output
+
+                    String result;
+                    if (event == Events.FromAndroid.WORK_COMPLETE_SUCC) {
+                        pullResult(msg);
+                        result = "success";
+                    } else {
+                        result = "fail";
+                    }
+                    log("work complete; result => " + result);
+                    onWorkComplete();
+                    break;
+
+                case ERROR_OCCURED:
+                    //msg = Android端错误信息
+                    log("server error occured: " + msg);
+                    break;
+            }
+        }
+
+        @Override
+        public void onExceptionOccured(Throwable th) {
+            log("socket exception occured, try restart work; cause => " + getStackTraceMessage(th));
+            new Thread(Transport.this::start).start();
         }
     };
 
-    public void adbConnect(String adbEnv, String hostPort) {
+    Transport(Params params) {
+        if (params == null) {
+            showUsage();
+            return;
+        }
+        mParams = params;
+
+        String adb = mParams.adbEnv;
+        mAdb = isNullStr(adb) ? DEFAULT_ADB_ENV : adb;
+    }
+
+    public synchronized void start() {
+        adbConnect();
+        closeSocket();
+        connectServer();
+        sendMessage(Events.FromPC.CONNECT_REQUEST, null);
+    }
+
+    private void onConnectSuccess(String serverWorkDir) {
+        mParams.serverWorkDir = serverWorkDir;
+        String extMsg = mParams.extMsg;
+
+        if (!isNullStr(extMsg)) {
+            sendMessage(Events.FromPC.EXTENDED_MESSAGE, extMsg);
+        }
+
+        //msg = Android端workDir exp: /sdcard/xxx/xxx
+        pushData();
+        sendMessage(Events.FromPC.PUSH_DATA_FINISH, new File(mParams.inputDir).getName());
+    }
+
+    private void onWorkComplete() {
+        sendMessage(Events.FromPC.CLOSE_SERVER_APP, null);
+        closeSocket();
+        deleteServerWorkDir();
+    }
+
+    private void adbConnect() {
         log("adb connect...");
 
-        if (adbEnv != null)
-            mAdb = adbEnv;
-        else
-            mAdb = DEFAULT_ADB_ENV;
-
+        String hostPort = mParams.hostPort;
         Command.Result connect = Command.exec(String.format("%s connect %s", mAdb, hostPort));
         mAdb = String.format("%s -s %s ", mAdb, hostPort);
 
@@ -51,11 +128,11 @@ public class Transport {
         log("adb connect success");
     }
 
-    public void connectServer(int clientPort, int serverPort, String amParam) {
+    private void connectServer() {
 
         // 连接失败超时处理
         for (int time = 0; time <= ATTEMPT_MAX_TIME; time++) {
-            if (connectServerInternal(clientPort, serverPort, amParam)) {
+            if (connectServerInternal(mParams.clientPort, mParams.serverPort, mParams.amParam)) {
                 log("connect to server success");
                 return;
             } else {
@@ -64,7 +141,7 @@ public class Transport {
                 }
 
                 log(String.format(Locale.ENGLISH,
-                        "connect to server fail, wait 10s to try next connect(%d/%d)",
+                        "connect to server fail, wait 5s to try next connect(%d/%d)",
                         time + 1, ATTEMPT_MAX_TIME));
                 try {
                     Thread.sleep(CONNECT_TIMEOUT);
@@ -98,38 +175,38 @@ public class Transport {
         return mClientSocket.connect();
     }
 
-    public void pushData(String clientSrcDir, String serverWorkDir) {
-        log("push " + clientSrcDir + " to " + serverWorkDir);
+    private void pushData() {
+        String clientSrcDir = mParams.inputDir;
+        String serverWorkDir = mParams.serverWorkDir;
 
-        this.mServerWorkDir = serverWorkDir;
+        log("start push " + clientSrcDir + " to " + serverWorkDir);
+
         Command.exec(mAdb + "shell mkdir -p " + serverWorkDir);
-        Command.Result push = Command.exec(String.format("%s push %s %s", mAdb, clientSrcDir, mServerWorkDir));
+        Command.Result push = Command.exec(String.format("%s push %s %s", mAdb, clientSrcDir, serverWorkDir));
         if (!push.isSucc) throw new ClientException("push data fail", push);
-        log("push data success");
+        log("push completed");
     }
 
-    public void pullResult(String clientOutputDir, String serverOutputDir) {
+    private void pullResult(String serverOutputDir) {
         log("server work completed, start pull result data");
-        Command.Result pull = Command.exec(String.format("%s pull %s %s", mAdb, serverOutputDir, clientOutputDir));
+
+        Command.Result pull = Command.exec(String.format("%s pull %s %s", mAdb, serverOutputDir, mParams.outputDir));
         if (!pull.isSucc) throw new ClientException("pull fail", pull);
-        log("pull completed, output to " + clientOutputDir);
+        log("pull completed, output to " + mParams.outputDir);
     }
 
-    public void deleteServerWorkDir() {
-        if (mServerWorkDir != null) {
-            Command.exec(mAdb + "shell rm -rf " + mServerWorkDir);
+    private void deleteServerWorkDir() {
+        if (!isNullStr(mParams.serverWorkDir)) {
+            Command.exec(mAdb + "shell rm -rf " + mParams.serverWorkDir);
         }
     }
 
-    public void registerResponder(Responder responder) {
-        this.mResponder = responder;
-    }
-
-    public synchronized void sendMessage(Events.FromPC event, String msg) {
+    private synchronized void sendMessage(Events.FromPC event, String msg) {
+        log(String.format("client send msg: event => %s; msg => %s", event.name(), msg));
         mClientSocket.sendMessage(event.getCode(), msg);
     }
 
-    public void closeSocket() {
+    private void closeSocket() {
         try {
             Thread.sleep(200);
         } catch (InterruptedException e) {

@@ -5,7 +5,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 
-public abstract class ClientSocket implements Runnable {
+public abstract class ClientSocket implements Runnable, Responder {
 
     private static final String DEFAULT_SERVER_HOST = "127.0.0.1";
 
@@ -15,13 +15,23 @@ public abstract class ClientSocket implements Runnable {
 
     @Override
     public void run() {
+        DataInputStream dis = null;
         try {
             while (!mSocket.isClosed()) {
-                DataInputStream dis = new DataInputStream(mSocket.getInputStream());
-                onReceive(dis.readInt(), dis.readUTF());
+                dis = new DataInputStream(mSocket.getInputStream());
+                onResponse(Events.FromAndroid.getEvent(dis.readInt()), dis.readUTF());
             }
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            // 在这里捕获 socket 出现任何异常
+            onExceptionOccured(e);
+        } finally {
+            if (dis != null) {
+                try {
+                    dis.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 
@@ -61,7 +71,16 @@ public abstract class ClientSocket implements Runnable {
                 e.printStackTrace();
             }
         }
+
+        if (mDos != null) {
+            try {
+                mDos.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
-    public abstract void onReceive(int code, String msg);
+    //发生必须要处理的异常
+    public abstract void onExceptionOccured(Throwable th);
 }
