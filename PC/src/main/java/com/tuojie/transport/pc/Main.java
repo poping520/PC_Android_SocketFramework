@@ -12,9 +12,12 @@ import static com.tuojie.transport.pc.Utils.*;
  * 工作流程<p>
  * 发送连接请求 => 收到连接成功消息 => PUSH数据 => 发送PUSH完成消息 => 收到任务完成消息 => PULL结果 => 发送PULL完成消息 => 结束程序<p>
  * <p>
+ * 1.0.7<p>
+ * 优化 程序出现异常后重新开始任务的最大次数改为 5 次<p>
+ * <p>
  * 1.0.6<p>
  * 增加 捕获到 socket 通信发生的异常后重新开始任务 {@link ClientSocket#run()}
- * 优化 整体代码结构
+ * 优化 整体代码结构<p>
  * <p>
  * 1.0.5<p>
  * 增加 连接失败超时和服务端无响应超时处理 超时后会进行一定次数内的重试<p>
@@ -43,7 +46,7 @@ public class Main {
 
     private static final String VERSION = "1.0.6";
 
-    public static final boolean DEBUG = false;
+    static final boolean DEBUG = false;
 
     private static final String LOG_FILE_NAME = "socket_framework.log";
 

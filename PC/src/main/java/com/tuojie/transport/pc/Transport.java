@@ -31,6 +31,8 @@ class Transport {
     // adb 环境
     private String mAdb;
 
+    private int mExceptionTime;
+
     private ClientSocket mClientSocket = new ClientSocket() {
 
         @Override
@@ -71,7 +73,16 @@ class Transport {
 
         @Override
         public void onExceptionOccured(Throwable th) {
-            log("socket exception occured, try restart work; cause => " + getStackTraceMessage(th));
+            if (mExceptionTime >= ATTEMPT_MAX_TIME / 2) {
+                log("socket exception occured, try max times; cause => " + getStackTraceMessage(th));
+                return;
+            }
+
+            ++mExceptionTime;
+            final String format =
+                    String.format("socket exception occured, try restart work(%s/%s); cause => %s",
+                            mExceptionTime, ATTEMPT_MAX_TIME / 2, getStackTraceMessage(th));
+            log(format);
             new Thread(Transport.this::start).start();
         }
     };
@@ -82,9 +93,6 @@ class Transport {
             return;
         }
         mParams = params;
-
-        String adb = mParams.adbEnv;
-        mAdb = isNullStr(adb) ? DEFAULT_ADB_ENV : adb;
     }
 
     public synchronized void start() {
@@ -115,6 +123,9 @@ class Transport {
 
     private void adbConnect() {
         log("adb connect...");
+
+        String adb = mParams.adbEnv;
+        mAdb = isNullStr(adb) ? DEFAULT_ADB_ENV : adb;
 
         String hostPort = mParams.hostPort;
         Command.Result connect = Command.exec(String.format("%s connect %s", mAdb, hostPort));
@@ -191,7 +202,8 @@ class Transport {
         log("server work completed, start pull result data");
 
         Command.Result pull = Command.exec(String.format("%s pull %s %s", mAdb, serverOutputDir, mParams.outputDir));
-        if (!pull.isSucc) throw new ClientException("pull fail", pull);
+        if (!pull.isSucc)
+            log("pull fail " + pull);
         log("pull completed, output to " + mParams.outputDir);
     }
 
