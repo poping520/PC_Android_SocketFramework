@@ -44,7 +44,7 @@ import static com.tuojie.transport.pc.Utils.*;
  */
 public class Main {
 
-    private static final String VERSION = "1.0.6";
+    private static final String VERSION = "1.0.7";
 
     static final boolean DEBUG = false;
 
