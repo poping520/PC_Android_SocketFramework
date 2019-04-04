@@ -74,18 +74,13 @@ public abstract class WorkActivity extends Activity {
                     break;
 
                 case CLOSE_SERVER_APP:
+                    mTransport.onDestroy();
                     finish();
                     break;
             }
         });
 
         mTransport.start();
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        mTransport.onDestroy();
     }
 
     @SuppressLint("SdCardPath")

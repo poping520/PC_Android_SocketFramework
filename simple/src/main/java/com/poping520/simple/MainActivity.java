@@ -29,12 +29,14 @@ public class MainActivity extends WorkActivity {
         return 0;
     }
 
+    // java -jar socket_framework_pc.jar -log -h 8fbfcc4f -am com.poping520.simple/.MainActivity -in J:\test_data\test
+    // java -jar socket_framework_pc.jar -log -h 127.0.0.1:62001 -am com.poping520.simple/.MainActivity -in J:\test_data\test
     @Override
     protected void doWork(String dataDir, String outputDir, String extMsg, WorkListener listener) {
         //outputDir = dataDir + "/output"
 
-        Log.e(TAG, "dataDir=" + dataDir);
-        Log.e(TAG, "outputDir=" + outputDir);
+        Log.e(TAG, "dataDir = " + dataDir);
+        Log.e(TAG, "outputDir = " + outputDir);
 
         listener.onProgress("开始任务");
 

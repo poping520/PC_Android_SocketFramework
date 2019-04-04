@@ -10,5 +10,23 @@ dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 }
 
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+}
+
+def OUTPUT_NAME = "socket_framework_pc.jar"
+
+build.doLast {
+    delete("build/libs/$OUTPUT_NAME")
+    copy {
+        from('build/libs/PC.jar')
+        into('build/libs/')
+        rename {
+            "$OUTPUT_NAME"
+        }
+    }
+    delete('build/libs/PC.jar')
+}
+
 sourceCompatibility = "1.8"
 targetCompatibility = "1.8"

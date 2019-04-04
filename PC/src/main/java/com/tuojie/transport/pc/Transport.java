@@ -1,12 +1,17 @@
 package com.tuojie.transport.pc;
 
-import java.io.File;
-import java.util.Locale;
+import com.tuojie.transport.pc.adb.AdbWrapper;
+import com.tuojie.transport.pc.adb.DeviceState;
 
+import java.io.File;
+import java.util.Map;
+
+import static com.tuojie.transport.pc.Utils.getCurrentTime;
+import static java.lang.String.format;
 import static com.tuojie.transport.pc.Main.*;
 import static com.tuojie.transport.pc.Logger.log;
 import static com.tuojie.transport.pc.Utils.getStackTraceMessage;
-import static com.tuojie.transport.pc.Utils.isNullStr;
+import static com.tuojie.transport.pc.Utils.isEmpty;
 
 /**
  * @author WangKZ
@@ -28,8 +33,7 @@ class Transport {
     // 参数
     private Params mParams;
 
-    // adb 环境
-    private String mAdb;
+    private AdbWrapper mAdb;
 
     private int mExceptionTime;
 
@@ -60,8 +64,8 @@ class Transport {
                     } else {
                         result = "fail";
                     }
-                    log("work complete; result => " + result);
                     onWorkComplete();
+                    log("==> work completed at %s result => %s", getCurrentTime(), result);
                     break;
 
                 case ERROR_OCCURED:
@@ -79,10 +83,8 @@ class Transport {
             }
 
             ++mExceptionTime;
-            final String format =
-                    String.format("socket exception occured, try restart work(%s/%s); cause => %s",
-                            mExceptionTime, ATTEMPT_MAX_TIME / 2, getStackTraceMessage(th));
-            log(format);
+            log("socket exception occured, try restart work(%s/%s); cause => %s",
+                    mExceptionTime, ATTEMPT_MAX_TIME / 2, getStackTraceMessage(th));
             new Thread(Transport.this::start).start();
         }
     };
@@ -92,11 +94,20 @@ class Transport {
             showUsage();
             return;
         }
+
+        log("\n==> work start at %s", getCurrentTime());
+
         mParams = params;
+
+        String adbEnv = mParams.adbEnv;
+        if (isEmpty(adbEnv)) {
+            adbEnv = DEFAULT_ADB_ENV;
+        }
+        mAdb = new AdbWrapper(adbEnv);
     }
 
     public synchronized void start() {
-        adbConnect();
+        connectDevice();
         closeSocket();
         connectServer();
         sendMessage(Events.FromPC.CONNECT_REQUEST, null);
@@ -106,7 +117,7 @@ class Transport {
         mParams.serverWorkDir = serverWorkDir;
         String extMsg = mParams.extMsg;
 
-        if (!isNullStr(extMsg)) {
+        if (!isEmpty(extMsg)) {
             sendMessage(Events.FromPC.EXTENDED_MESSAGE, extMsg);
         }
 
@@ -121,22 +132,43 @@ class Transport {
         deleteServerWorkDir();
     }
 
-    private void adbConnect() {
-        log("adb connect...");
+    private void connectDevice() {
+        Map<String, DeviceState> devices = mAdb.devices();
 
-        String adb = mParams.adbEnv;
-        mAdb = isNullStr(adb) ? DEFAULT_ADB_ENV : adb;
+        // 找不到任何设备
+        if (isEmpty(devices)) {
+            throw new ClientException("no device has been found anymore");
+        }
 
-        String hostPort = mParams.hostPort;
-        Command.Result connect = Command.exec(String.format("%s connect %s", mAdb, hostPort));
-        mAdb = String.format("%s -s %s ", mAdb, hostPort);
+        // 8fbfcc4f or 127.0.0.1:62001
+        String device = mParams.device;
+        boolean isWifiConn = device.contains(".") || device.contains(":");
+        DeviceState state = devices.get(device);
 
-        if (!connect.isSucc
-                || connect.succMsg.contains("unable to connect to " + hostPort)
-                || connect.succMsg.contains("cannot connect to " + hostPort))
-            throw new ClientException("adb connect fail", connect);
-
-        log("adb connect success");
+        // 设备已连接
+        if (state != null && state == DeviceState.DEVICE) {
+            log(isWifiConn ?
+                    format("device '%s' is connected already", device) :
+                    format("find device '%s'", device)
+            );
+        } else { // 未找到设备 或者 设备是未连接状态
+            if (!isWifiConn) {
+                throw new ClientException(
+                        state == null ?
+                                format("device '%s' is not found", device) :
+                                format("device '%s' is %s", device, state)
+                );
+            } else {
+                log("adb connect...");
+                boolean connect = mAdb.connect(device);
+                if (!connect) {
+                    throw new ClientException("adb connect fail", mAdb.getLastCmdRet());
+                } else {
+                    log("adb connect success");
+                }
+            }
+        }
+        mAdb.setTargetDevice(mParams.device);
     }
 
     private void connectServer() {
@@ -151,9 +183,8 @@ class Transport {
                     throw new ClientException("connect to server timeout");
                 }
 
-                log(String.format(Locale.ENGLISH,
-                        "connect to server fail, wait 5s to try next connect(%d/%d)",
-                        time + 1, ATTEMPT_MAX_TIME));
+                log("connect to server fail, wait 5s to try next connect(%s/%s)",
+                        time + 1, ATTEMPT_MAX_TIME);
                 try {
                     Thread.sleep(CONNECT_TIMEOUT);
                 } catch (InterruptedException e) {
@@ -167,21 +198,29 @@ class Transport {
         clientPort = clientPort == 0 ? DEFAULT_CLIENT_PORT : clientPort;
         serverPort = serverPort == 0 ? DEFAULT_SERVER_PORT : serverPort;
 
-        Command.Result forward = Command.exec(String.format("%s forward tcp:%s tcp:%s", mAdb, clientPort, serverPort));
-        if (!forward.isSucc) {
+        if (!mAdb.forward(clientPort, serverPort)) {
             log("adb forward fail");
             return false;
         }
         mClientSocket.setPort(clientPort);
 
         String pkgName = amParam.substring(0, amParam.indexOf("/"));
-        Command.exec(mAdb + "shell am force-stop " + pkgName);
-        Command.Result startAct = Command.exec(String.format("%s shell am start -n %s", mAdb, amParam));
-        if (!startAct.isSucc || startAct.succMsg.contains("does not exist")) {
-            log("server app [" + pkgName + "] start fail, reason => " + startAct.toString());
+        mAdb.shell_closeApp(pkgName);
+        boolean launchApp = mAdb.shell_launchApp(amParam);
+        if (!launchApp) {
+            log("server app [%s] launch fail, reason => %s", pkgName, mAdb.getLastCmdRet());
             return false;
         }
-        log("server app [" + pkgName + "] start success");
+
+        log("server app [%s] launch success", pkgName);
+
+        // 等待 服务端 ServerSocket 初始化
+        try {
+            log("wait server socket initialize");
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
 
         return mClientSocket.connect();
     }
@@ -190,31 +229,31 @@ class Transport {
         String clientSrcDir = mParams.inputDir;
         String serverWorkDir = mParams.serverWorkDir;
 
-        log("start push " + clientSrcDir + " to " + serverWorkDir);
+        mAdb.shell_forceCreateDir(serverWorkDir);
 
-        Command.exec(mAdb + "shell mkdir -p " + serverWorkDir);
-        Command.Result push = Command.exec(String.format("%s push %s %s", mAdb, clientSrcDir, serverWorkDir));
-        if (!push.isSucc) throw new ClientException("push data fail", push);
+        log("start push PC:'%s' to Android:'%s'", clientSrcDir, serverWorkDir);
+        boolean push = mAdb.push(clientSrcDir, serverWorkDir);
+        if (!push) throw new ClientException("push data fail", mAdb.getLastCmdRet());
         log("push completed");
     }
 
     private void pullResult(String serverOutputDir) {
         log("server work completed, start pull result data");
 
-        Command.Result pull = Command.exec(String.format("%s pull %s %s", mAdb, serverOutputDir, mParams.outputDir));
-        if (!pull.isSucc)
-            log("pull fail " + pull);
+        boolean pull = mAdb.pull(serverOutputDir, mParams.outputDir);
+        if (!pull)
+            log("pull fail " + mAdb.getLastCmdRet());
         log("pull completed, output to " + mParams.outputDir);
     }
 
     private void deleteServerWorkDir() {
-        if (!isNullStr(mParams.serverWorkDir)) {
-            Command.exec(mAdb + "shell rm -rf " + mParams.serverWorkDir);
+        if (!isEmpty(mParams.serverWorkDir)) {
+            mAdb.shell_forceRemove(mParams.serverWorkDir);
         }
     }
 
     private synchronized void sendMessage(Events.FromPC event, String msg) {
-        log(String.format("client send msg: event => %s; msg => %s", event.name(), msg));
+        log("client send msg: event => %s; msg => %s", event.name(), msg);
         mClientSocket.sendMessage(event.getCode(), msg);
     }
 

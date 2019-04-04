@@ -19,7 +19,9 @@ public abstract class ClientSocket implements Runnable, Responder {
         try {
             while (!mSocket.isClosed()) {
                 dis = new DataInputStream(mSocket.getInputStream());
-                onResponse(Events.FromAndroid.getEvent(dis.readInt()), dis.readUTF());
+                int code = dis.readInt();
+                String msg = dis.readUTF();
+                onResponse(Events.FromAndroid.getEvent(code), msg);
             }
         } catch (Exception e) {
             // 在这里捕获 socket 出现任何异常

@@ -1,15 +1,14 @@
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 27
+    compileSdkVersion 28
     defaultConfig {
         minSdkVersion 19
-        targetSdkVersion 27
-        versionCode 4
-        versionName "1.0.4"
+        targetSdkVersion 28
+        versionCode buildTimeInt()
+        versionName "1.0.5"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
-
     buildTypes {
         release {
             minifyEnabled false
@@ -20,10 +19,32 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
-}
 
+    android.libraryVariants.all { variant ->
+        variant.outputs.all {
+            //-${defaultConfig.versionName}
+            outputFileName = "socket_framework_android.arr"
+        }
+    }
+}
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
 }
 
+def static buildTimeInt() {
+    return Integer.parseInt(new Date().format("yyyyMMdd", TimeZone.getTimeZone("UTC")))
+}
+
+def OUTPUT = "socket_framework_android.jar"
+
+// 生成 jar 包
+task buildJar(type: Copy) {
+    delete "build/outputs/libs/$OUTPUT"
+    from('build/intermediates/packaged-classes/release/')
+    into('build/outputs/libs')
+    include('classes.jar')
+    rename('classes.jar', "$OUTPUT")
+}
+
+buildJar.dependsOn(build)

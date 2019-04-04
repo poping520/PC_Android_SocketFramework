@@ -1,16 +1,18 @@
 package com.tuojie.transport.pc;
 
+import com.tuojie.transport.pc.adb.Command;
+
 import static com.tuojie.transport.pc.Logger.log;
 
-class ClientException extends RuntimeException {
+public class ClientException extends RuntimeException {
 
-    ClientException(String message) {
+    public ClientException(String message) {
         this(message, null);
     }
 
-    ClientException(String message, Command.Result result) {
+    public ClientException(String message, Command.Result result) {
         super(message);
         String str = result == null ? "" : result.toString();
-        log(String.format("ClientException occured; cause => %s\n%s", message, str));
+        log(String.format("ClientException occured: cause => %s\n%s", message, str));
     }
 }

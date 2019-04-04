@@ -1,4 +1,6 @@
-package com.tuojie.transport.pc;
+package com.tuojie.transport.pc.adb;
+
+import com.tuojie.transport.pc.Main;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -25,10 +27,10 @@ public final class Command {
 
             String s;
             while ((s = succBR.readLine()) != null) {
-                succMsg.append(s);
+                succMsg.append(s).append("\n");
             }
             while ((s = errorBR.readLine()) != null) {
-                errorMsg.append(s);
+                errorMsg.append(s).append("\n");
             }
 
             result = process.waitFor();
@@ -61,8 +63,8 @@ public final class Command {
 
         @Override
         public String toString() {
-            return "command='" + command + "\n" +
-                    "message='" + succMsg + " " + errorMsg;
+            return "command=" + command + "\n" +
+                    "message=" + succMsg + " " + errorMsg + "";
         }
     }
 }

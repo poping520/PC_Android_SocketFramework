@@ -1,8 +1,5 @@
 package com.tuojie.transport.pc;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * 事件类型
  *
@@ -89,14 +86,17 @@ public class Events {
             return mCode;
         }
 
+        /**
+         * 使用 code 获取 Event 对象
+         */
         public static FromAndroid getEvent(int code) {
-            Map<Integer, FromAndroid> map = new HashMap<>();
             FromAndroid[] events = FromAndroid.values();
-
             for (FromAndroid event : events) {
-                map.put(event.getCode(), event);
+                if (event.mCode == code) {
+                    return event;
+                }
             }
-            return map.get(code);
+            throw new IllegalArgumentException("unknown event code");
         }
     }
 }
