@@ -3,6 +3,12 @@ package com.tuojie.transport.android;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
+
+import static com.tuojie.transport.android.Events.FromAndroid.*;
+
 
 import java.io.File;
 
@@ -11,7 +17,7 @@ import java.io.File;
  * 工作流程
  * 收到连接请求 => 发送连接成功消息 => 收到PUSH完成消息 => 开始任务 => 发送任务完成消息 => 收到PULL完成消息 => 结束程序
  * <p>
- * 自定义Activity继承此类，将任务逻辑写到{@link #doWork(String, String, String, WorkListener)}中
+ * 自定义Activity继承此类，将任务逻辑写到{@link #doWork(String, String, String, Sender)}中
  *
  * @author WangKZ
  * create on 2018/6/25 10:43
@@ -28,26 +34,62 @@ public abstract class WorkActivity extends Activity {
 
     private String mExtMsg;
 
-    private WorkListener mWorkListener = new WorkListener() {
+    private UiListener mUiListener;
+
+    private Handler mUiHandler;
+
+    private Sender mSender = new Sender() {
 
         @Override
-        public void onProgress(String progressMsg) {
-            mTransport.sendMessage(Events.FromAndroid.WORK_PROGRESS, progressMsg);
+        public void sendProgress(boolean callback, String progressMsg) {
+
+            mTransport.sendMessage(WORK_PROGRESS, progressMsg);
+
+            if (callback) {
+                notifyUi(progressMsg);
+            }
         }
 
         @Override
-        public void onWorkComplete(boolean isSuccess) {
-            if (isSuccess)
-                mTransport.sendMessage(Events.FromAndroid.WORK_COMPLETE_SUCC, mOutputDir);
-            else
-                mTransport.sendMessage(Events.FromAndroid.WORK_COMPLETE_FAIL, "");
+        public void sendFinish(boolean isSuccess) {
+            if (isSuccess) {
+                mTransport.sendMessage(WORK_COMPLETE_SUCC, mOutputDir);
+            } else {
+                mTransport.sendMessage(WORK_COMPLETE_FAIL, "");
+            }
         }
 
         @Override
-        public void onWorkError(String errorMsg) {
-            mTransport.sendMessage(Events.FromAndroid.ERROR_OCCURED, errorMsg);
+        public void sendError(String errorMsg) {
+            mTransport.sendMessage(ERROR_OCCURED, errorMsg);
         }
     };
+
+    /**
+     * 注册 UI 进度回调
+     */
+    public void registerUiListener(UiListener listener) {
+        if (listener == null) {
+            return;
+        }
+
+        this.mUiListener = listener;
+
+        mUiHandler = new Handler(Looper.getMainLooper()) {
+            @Override
+            public void handleMessage(Message msg) {
+                super.handleMessage(msg);
+                mUiListener.onUiProgress((String) msg.obj);
+            }
+        };
+    }
+
+    private void notifyUi(String msg) {
+        if (mUiListener == null || mUiHandler == null) {
+            return;
+        }
+        mUiHandler.sendMessage(mUiHandler.obtainMessage(0, msg));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,7 +102,7 @@ public abstract class WorkActivity extends Activity {
         mTransport.registerResponder((event, msg) -> {
             switch (event) {
                 case CONNECT_REQUEST:
-                    mTransport.sendMessage(Events.FromAndroid.CONNECT_SUCCESS, mWorkDir);
+                    mTransport.sendMessage(CONNECT_SUCCESS, mWorkDir);
                     break;
 
                 case EXTENDED_MESSAGE:
@@ -70,7 +112,7 @@ public abstract class WorkActivity extends Activity {
                 case PUSH_DATA_FINISH:
                     //msg = 存放数据的文件夹名字 exp: shared_prefs
                     doWork(mWorkDir + File.separator + msg,
-                            mOutputDir, mExtMsg, mWorkListener);
+                            mOutputDir, mExtMsg, mSender);
                     break;
 
                 case CLOSE_SERVER_APP:
@@ -106,7 +148,7 @@ public abstract class WorkActivity extends Activity {
      * @param dataDir   目标数据的存放目录
      * @param outputDir 输出目录
      * @param extMsg    扩展消息
-     * @param listener  任务进度回调
+     * @param sender    任务进度回调
      */
-    protected abstract void doWork(String dataDir, String outputDir, String extMsg, WorkListener listener);
+    protected abstract void doWork(String dataDir, String outputDir, String extMsg, Sender sender);
 }

@@ -12,6 +12,9 @@ import static com.tuojie.transport.pc.Utils.*;
  * 工作流程<p>
  * 发送连接请求 => 收到连接成功消息 => PUSH数据 => 发送PUSH完成消息 => 收到任务完成消息 => PULL结果 => 发送PULL完成消息 => 结束程序<p/>
  * <p>
+ * 1.0.9<p>
+ * 修改 "-ext" 参数，支持从文件传入
+ * <p>
  * 1.0.8<p>
  * 修改 服务端 socket 发送消息逻辑<p/>
  * 优化 socket 连接成功率<p/>
@@ -50,8 +53,8 @@ import static com.tuojie.transport.pc.Utils.*;
  */
 public class Main {
 
-    private static final String VERSION_NAME = "1.0.8";
-    private static final String VERSION_CODE = "20190404";
+    private static final String VERSION_NAME = "1.0.9";
+    private static final String VERSION_CODE = "20190412";
 
     // 是否显示执行的命令
     public static final boolean DEBUG = false;
@@ -83,7 +86,7 @@ public class Main {
                 params.adbEnv = args[++argstart];
                 ++argstart;
             } else if ("-ext".equals(args[argstart])) {
-                params.extMsg = args[++argstart];
+                parseExtMsg(params, args[++argstart]);
                 ++argstart;
             } else if ("-log".equals(args[argstart])) {
                 params.saveLog = true;
@@ -155,6 +158,15 @@ public class Main {
         Logger.init(p.saveLog, new File(outFile, LOG_FILE_NAME));
     }
 
+    // extMsg 可以为扩展参数文件路径 或者 扩展参数字符串
+    private static void parseExtMsg(Params p, String extMsg) {
+        String extMsg0 = extMsg;
+        if (isExistFile(extMsg)) {
+            extMsg0 = readTextFile(extMsg);
+        }
+        p.extMsg = extMsg0;
+    }
+
     static void showUsage() {
         System.out.println("\nPC_Android_SocketFramework\n");
         if (Locale.getDefault() == Locale.CHINA) {
@@ -177,7 +189,7 @@ public class Main {
                 "  (optional params):\n" +
                 "  (-out <output dir>)                  default=>input dir's parent dir\n" +
                 "  (-adb <custom adb path>)             default=>use system env adb\n" +
-                "  (-ext <extended message>)            send to server before push data\n" +
+                "  (-ext <extended message>)            it's string or file path, send to server before push data\n" +
                 "  (-log)                               whether to save log, save to output dir\n" +
                 "  (-cp  <client port>)                 default=>6789\n" +
                 "  (-sp  <server port >)                default=>9876");
@@ -188,16 +200,16 @@ public class Main {
                 "  v%s(%s)", VERSION_NAME, VERSION_CODE));
         System.out.println("用法：\n" +
                 "  [必填参数]：\n" +
-                "  [-h   <序列号或'host:port'>] 连接到ADB调试，USB或WIFI\n" +
+                "  [-h   <序列号或'host:port'>] 连接到 ADB 调试，USB 或 WIFI\n" +
                 "  [-am  <am命令的参数>]        '包名/启动全类名'，启动服务端程序\n" +
                 "  [-in  <输入文件夹>]          保存所有的待操作数据\n" +
                 "  \n" +
                 "  (可选参数)：\n" +
-                "  (-out <输出文件夹>)    默认为：输入文件夹的父目录\n" +
-                "  (-adb <自定义adb路径>) 默认为：系统环境变量的adb\n" +
-                "  (-ext <拓展信息>)      push数据前发送给服务端\n" +
-                "  (-log)                是否保存日志，保存到输出文件夹\n" +
-                "  (-cp  <客户端端口号>)  默认为：6789\n" +
-                "  (-sp  <服务端端口号>)  默认为：9876");
+                "  (-out <输出文件夹>)      默认为：输入文件夹的父目录\n" +
+                "  (-adb <自定义adb路径>)   默认为：系统环境变量的 adb\n" +
+                "  (-ext <扩展信息>)        支持字符串和文件传入，push 数据前发送给服务端\n" +
+                "  (-log)                   是否保存日志，保存到输出文件夹\n" +
+                "  (-cp  <客户端端口号>)    默认为：6789\n" +
+                "  (-sp  <服务端端口号>)    默认为：9876");
     }
 }

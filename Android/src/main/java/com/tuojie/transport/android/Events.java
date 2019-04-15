@@ -1,7 +1,5 @@
 package com.tuojie.transport.android;
 
-import android.util.SparseArray;
-
 /**
  * 事件类型
  *
@@ -33,7 +31,12 @@ public class Events {
         /**
          * 扩展消息
          */
-        EXTENDED_MESSAGE(0x3);
+        EXTENDED_MESSAGE(0x3),
+
+        /**
+         * 未知事件
+         */
+        UNKNOWN_EVENT(0xf);
 
 
         private int mCode;
@@ -47,12 +50,13 @@ public class Events {
         }
 
         public static FromPC getEvent(int code) {
-            SparseArray<FromPC> array = new SparseArray<>();
             FromPC[] events = FromPC.values();
-            for (FromPC e : events) {
-                array.put(e.mCode, e);
+            for (FromPC event : events) {
+                if (event.mCode == code) {
+                    return event;
+                }
             }
-            return array.get(code);
+            return UNKNOWN_EVENT;
         }
     }
 
@@ -84,7 +88,13 @@ public class Events {
         /**
          * 发生错误
          */
-        ERROR_OCCURED(0x14);
+        ERROR_OCCURED(0x14),
+
+
+        /**
+         * 未知事件
+         */
+        UNKNOWN_EVENT(0x1f);
 
 
         private int mCode;
@@ -95,6 +105,16 @@ public class Events {
 
         public int getCode() {
             return mCode;
+        }
+
+        public static FromAndroid getEvent(int code) {
+            FromAndroid[] events = FromAndroid.values();
+            for (FromAndroid event : events) {
+                if (event.mCode == code) {
+                    return event;
+                }
+            }
+            return UNKNOWN_EVENT;
         }
     }
 }
